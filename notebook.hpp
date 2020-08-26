@@ -12,6 +12,7 @@
 
 #include <QAbstractTableModel>
 #include <QDataStream>
+#include <QTextStream>
 
 #include "note.hpp"
 
@@ -103,6 +104,14 @@ public:
     void insert(const Note &note);
     //! Удаляет заметку с индексом \a idx из записной книжки.
     void erase(SizeType idx);
+
+    void saveAsTxt(QTextStream &out) const;
+
+    void exportJson(QTextStream &out) const;
+
+    Note &returnNote(const QModelIndex &index);
+
+    void edit (const QModelIndex &index, const QString title, const QString text);
 private:
     //! Внутренний контейнер для хранения заметок записной книжки.
     std::vector<Note> mNotes;
@@ -135,5 +144,7 @@ inline QDataStream &operator>>(QDataStream &ist, Notebook &notebook)
     notebook.load(ist);
     return ist;
 }
+
+
 
 #endif // NOTEBOOK_HPP

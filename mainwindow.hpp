@@ -64,6 +64,18 @@ private slots:
     //! Обновляет заголовок окна.
     void refreshWindowTitle();
     // В этом разделе перечисляются сигналы, которые выдаёт данный класс
+    void visitEcourses();
+
+    void closeProgram();
+
+    void saveNotebookAsText();
+
+    void ExportNotebookToJson();
+
+    void lottery();
+
+    void noteEdit(const QModelIndex &index);
+
 signals:
     /*!
      * \brief Сигнал об изменении имени открытого файла.
@@ -86,6 +98,8 @@ signals:
     void notebookSaved();
     //! Сигнализирует, что записная книжка успешно закрыта.
     void notebookClosed();
+
+
     /*
      * В этом разделе перечисляются закрытые члены класса, которые обеспечивают
      * его работу и недоступны извне.
@@ -108,7 +122,6 @@ private:
     void setNotebook(Notebook *notebook);
     //! Уничтожает объект текущей записной книжки.
     void destroyNotebook();
-
     /*!
      * \brief Указатель на сгенерированный интерфейс.
      *

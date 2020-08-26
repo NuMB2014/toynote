@@ -17,6 +17,11 @@
 #include <QMessageBox>
 #include <QSaveFile>
 #include <QtGlobal> // qVersion()
+#include <QDesktopServices>
+#include <QTextStream>
+#include <QRandomGenerator>
+#include <QDate>
+#include <vector>
 
 #include "config.hpp"
 #include "editnotedialog.hpp"
@@ -33,8 +38,8 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     // Присоединяем сигналы, соответствующие изменению статуса записной книжки,
     // к слоту, обеспечивающему обновление заголовка окна
-    connect(this, &MainWindow::notebookReady, this, &MainWindow::refreshWindowTitle);
-    connect(this, &MainWindow::notebookClosed, this, &MainWindow::refreshWindowTitle);
+    connect(this, &MainWindow::notebookReady,   this, &MainWindow::refreshWindowTitle);
+    connect(this, &MainWindow::notebookClosed,  this, &MainWindow::refreshWindowTitle);
     // Присоединяем сигнал создания записной книжки к лямбда-выражению,
     // устанавливающему в главном окне признак изменения (имеет ли текущий
     // документ несохранённые изменения). В заголовке окна при наличии
@@ -99,6 +104,7 @@ void MainWindow::displayAbout()
     // Устанавливаем основной текст в окне aboutDlg
     aboutDlg.setText(tr("%1 %2<br>"
         "Author: <a href=\"mailto:kpushkarev@sfu-kras.ru\">Kirill Pushkaryov</a>, 2019.<br>"
+        "Oleg Dmitrievich Rybin, KI19-09B, 031833063.<br>"
         "This application is dynamically linked against the "
         "<a href=\"https://www.qt.io/developers/\">Qt Library</a> "
         "v. %3, which is under the LGPLv3 license.<br>"
@@ -272,10 +278,13 @@ bool MainWindow::closeNotebook()
         return false;
     }
     return true;
+
+
 }
 
 bool MainWindow::newNote()
 {
+
     // Если записная книжка не открыта, выдаём сообщение об этом
     if (!isNotebookOpen())
     {
@@ -294,33 +303,47 @@ bool MainWindow::newNote()
     {
         return false;
     }
-    // Вставляем заметку в записную книжку
     mNotebook->insert(note);
     return true;
+
 }
 
 void MainWindow::deleteNotes()
 {
-    // Для хранения номеров строк создаём STL-контейнер "множество", элементы
-    // которого автоматически упорядочиваются по возрастанию
-    std::set<int> rows;
-    {
-        // Получаем от таблицы заметок список индексов выбранных в настоящий момент
-        // элементов
-        QModelIndexList idc = mUi->notesView->selectionModel()->selectedRows();
-        // Вставляем номера выбранных строк в rows
-        for (const auto &i : idc)
+    QMessageBox msgBox;
+    msgBox.setText("Do you want to delete note?");
+    msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+    msgBox.setDefaultButton(QMessageBox::Yes);
+    int ret = msgBox.exec();
+    switch (ret){
+    case (QMessageBox::Yes):{
+        // Для хранения номеров строк создаём STL-контейнер "множество", элементы
+        // которого автоматически упорядочиваются по возрастанию
+        std::set<int> rows;
         {
-            rows.insert(i.row());
+            // Получаем от таблицы заметок список индексов выбранных в настоящий момент
+            // элементов
+            QModelIndexList idc = mUi->notesView->selectionModel()->selectedRows();
+            // Вставляем номера выбранных строк в rows
+            for (const auto &i : idc)
+            {
+                rows.insert(i.row());
+            }
         }
+        // Обходим множество номеров выбранных строк *по убыванию*, чтобы удаление предыдущих
+        // не сбивало нумерацию следующих
+        for (auto it = rows.rbegin(); it != rows.rend(); ++it)
+        {
+            // Удаляем строку
+            mNotebook->erase(*it);
+        }
+        break;
     }
-    // Обходим множество номеров выбранных строк *по убыванию*, чтобы удаление предыдущих
-    // не сбивало нумерацию следующих
-    for (auto it = rows.rbegin(); it != rows.rend(); ++it)
-    {
-        // Удаляем строку
-        mNotebook->erase(*it);
+    case (QMessageBox::No):
+        return;
     }
+
+
 }
 
 void MainWindow::refreshWindowTitle()
@@ -340,6 +363,14 @@ void MainWindow::refreshWindowTitle()
         // Ставим в заголовок окна только название программы (Config::applicationName)
         setWindowTitle(Config::applicationName);
     }
+    mUi->actionNew_Note->setEnabled(isNotebookOpen());
+    mUi->actionDelete_Notes->setEnabled(isNotebookOpen());
+    mUi->notesView->setEnabled(isNotebookOpen());
+    mUi->actionSave_As->setEnabled(isNotebookOpen());
+    mUi->actionSaveAsText->setEnabled(isNotebookOpen());
+    mUi->actionCloseNotebook->setEnabled(isNotebookOpen());
+    mUi->actionSave->setEnabled(isNotebookOpen());
+    mUi->actionExport_to_JSON->setEnabled(isNotebookOpen());
 }
 
 /*!
@@ -378,8 +409,6 @@ void MainWindow::saveNotebookToFile(QString fileName)
         {
             throw std::runtime_error(tr("Unable to commit the save").toStdString());
         }
-        // Устанавливаем текущее имя файла
-        setNotebookFileName(fileName);
     }
     catch (const std::exception &e)
     {
@@ -446,4 +475,89 @@ void MainWindow::destroyNotebook()
     mUi->notesView->setModel(0);
     // Удаляем объект записной книжки
     mNotebook.reset();
+}
+
+void MainWindow::visitEcourses()
+{
+    QDesktopServices::openUrl(QUrl("http://e.sfu-kras.ru"));
+}
+
+void MainWindow::closeProgram()
+{
+    QCoreApplication::quit();
+}
+
+void MainWindow::saveNotebookAsText()
+{
+    if (!isNotebookOpen())
+    {
+        QMessageBox::warning(this, tr(Config::applicationName), tr("No open notebooks"));
+        return;
+    }
+
+    QString fileName = QFileDialog::getSaveFileName(this, tr("Save Notebook As Text"), QString(), tr("Text files (*.txt)"));
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly))
+    {
+        QMessageBox::warning(this, tr(Config::applicationName), tr("Cannot open file"));
+        return;
+    }
+    QTextStream output(&file);
+    mNotebook->saveAsTxt(output);
+    emit notebookReady();
+    emit notebookSaved();
+}
+
+void MainWindow::ExportNotebookToJson()
+{
+    if (!isNotebookOpen())
+    {
+        QMessageBox::warning(this, tr(Config::applicationName), tr("No open notebooks"));
+        return;
+    }
+
+    QString fileName = QFileDialog::getSaveFileName(this, tr("Export to JSON"), QString(), tr("JavaScript Native Object File (*.json)"));
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly))
+    {
+        QMessageBox::warning(this, tr(Config::applicationName), tr("Cannot open file"));
+        return;
+    }
+    QTextStream output(&file);
+    mNotebook->exportJson(output);
+    emit notebookReady();
+    emit notebookSaved();
+}
+
+void MainWindow::lottery()
+{
+    //Последняя цифра в зачетной книжке - 3
+    const std::vector <QString> prize = {
+        "Cadillac Escalade",
+        "1.000.000 $",
+        "1 mouth programming course",
+        "Ticket to the Donetsk Republic"};
+    quint8 ticket = ((QRandomGenerator::global()->generate()) % 20) + 1;
+    QMessageBox lott;
+    lott.setDefaultButton(QMessageBox::Ok);
+    lott.setTextFormat(Qt::RichText);//Поддержка HTML
+    lott.setText(tr("%1<br>Your ticket is number %2<br>%3").arg(QDate::currentDate().toString("dd.MM.yy")).arg(ticket)
+                 .arg(ticket <= 4 ? tr("You win. Your prize - %1.").arg(prize.at(ticket-1)) : "Your ticket is not a winning ticket."));
+    lott.exec();
+    return;
+}
+
+void MainWindow::noteEdit(const QModelIndex &index)
+{
+    EditNoteDialog noteDlg(this);
+    // Устанавливаем заголовок noteDlg
+    noteDlg.setWindowTitle(tr("Edit Note"));
+    noteDlg.setNote(&mNotebook->returnNote(index));
+    if (noteDlg.exec() != EditNoteDialog::Accepted)
+    {
+        return;
+    }
+    mNotebook->edit(index, noteDlg.title(), noteDlg.text());
 }

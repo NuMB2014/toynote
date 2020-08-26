@@ -7,7 +7,8 @@
 #include "editnotedialog.hpp"
 // Заголовочный файл UI-класса, сгенерированного на основе editnotedialog.ui
 #include "ui_editnotedialog.h"
-
+#include <QMessageBox>
+#include "config.hpp"
 #include "note.hpp"
 
 /*!
@@ -44,8 +45,9 @@ Note *EditNoteDialog::note() const
 void EditNoteDialog::setNote(Note *note)
 {
     mNote = note;
+    mUi->titleEdit->setText(note->title());
+    mUi->plainTextEdit->setPlainText(note->text());
 }
-
 /*!
  * Этот метод вызывается, когда пользователь подтверждает диалог, например
  * нажатием кнопки «OK». Метод изначально определён в базовом классе QDialog,
@@ -59,15 +61,20 @@ void EditNoteDialog::setNote(Note *note)
  */
 void EditNoteDialog::accept()
 {
-    // Читаем заголовок и текст заметки из полей диалога и записываем
-    // их в соответствующие атрибуты заметки по указателю mNote
-    mNote->setTitle(mUi->titleEdit->text());
-    // Получаем текст заметки из QPlainTextEdit
-    mNote->setText(mUi->plainTextEdit->toPlainText());
-    // Вызываем метод базового класса, чтобы он выполнил стандартные операции
-    // при закрытии диалогового окна. Если не вызвать его, то диалог не
-    // будет считаться подтверждённым и не закроется.
-    // Таким образом, в данном случае метод EditNoteDialog::accept() не подменяет
-    // собой метод QDialog::accept() совсем, а дополняет его.
-    QDialog::accept();
+    if (mUi->titleEdit->text().isEmpty() || mUi->plainTextEdit->toPlainText().isEmpty()){
+        QMessageBox::warning(this, tr(Config::applicationName), tr("Text or title is empty in your note. \nProgram can't save this.\nPlease fill all rows."));
+    }
+    else {
+        mNote->setTitle(mUi->titleEdit->text());
+        mNote->setText(mUi->plainTextEdit->toPlainText());
+        QDialog::accept();
+    }
+}
+
+QString EditNoteDialog::text(){
+    return mUi->plainTextEdit->toPlainText();
+}
+
+QString EditNoteDialog::title(){
+    return mUi->titleEdit->text();
 }

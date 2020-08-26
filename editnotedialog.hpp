@@ -53,6 +53,11 @@ public:
     Note *note() const;
     //! Устанавливает указатель на редактируемую заметку.
     void setNote(Note *note);
+
+    QString text();
+
+    QString title();
+
 public slots:
     //! Обрабатывает подтверждение диалога.
     void accept() Q_DECL_OVERRIDE;

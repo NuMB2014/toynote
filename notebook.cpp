@@ -8,9 +8,13 @@
 
 #include <iterator> // next()
 #include <stdexcept> // runtime_error
-
+#include <QTextStream>
+#include <QTranslator>
 #include <QString> // QString::number()
+#include <QJsonDocument>
+#include <QJsonObject>
 
+#include "ui_editnotedialog.h"
 #include "note.hpp"
 
 Notebook::Notebook()
@@ -199,4 +203,39 @@ void Notebook::erase(SizeType idx)
     // В соответствии с требованиями Qt, уведомляем привязанные виды о том,
     // что мы закончили удалять строки из модели
     endRemoveRows();
+}
+
+void Notebook::saveAsTxt(QTextStream &out) const{
+    int i = 1;
+    for (const Note &note : mNotes){
+    out << "+++" << i << "/" << size() << "+++\n"
+    << note.title() << "\n"
+    << note.text() << "\n"
+    << "---" << i++ << "/" << size() << "---\n";
+    }
+}
+
+void Notebook::exportJson(QTextStream &out) const{
+    QJsonObject json_obj;
+    int i = 0;
+    json_obj["size_of_notebook"] = size();
+    for (const Note &note : mNotes){
+        QJsonObject note_temp;
+        note_temp["title"] = note.title();
+        note_temp["text"] = note.text();
+        json_obj[QString::number(i)] = note_temp;
+        i++;
+    }
+    out << QJsonDocument(json_obj).toJson();
+}
+
+Note &Notebook::returnNote(const QModelIndex &index){
+    return mNotes.at(index.row());
+
+}
+
+void Notebook::edit(const QModelIndex &index, const QString title, const QString text){
+    mNotes.at(index.row()).setTitle(title);
+    mNotes.at(index.row()).setText(text);
+    emit dataChanged(index,index);
 }
